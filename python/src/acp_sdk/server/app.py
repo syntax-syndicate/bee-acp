@@ -5,10 +5,11 @@ from datetime import datetime, timedelta
 from enum import Enum
 
 from cachetools import TTLCache
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse, StreamingResponse
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from pydantic import AnyHttpUrl
 
 from acp_sdk.models import (
     Agent as AgentModel,
@@ -28,6 +29,7 @@ from acp_sdk.models import (
     RunResumeRequest,
     RunResumeResponse,
     SessionId,
+    SessionReadResponse,
 )
 from acp_sdk.models.errors import ACPError
 from acp_sdk.models.schemas import PingResponse
@@ -41,6 +43,7 @@ from acp_sdk.server.errors import (
     http_exception_handler,
     validation_exception_handler,
 )
+from acp_sdk.server.resource import ResourceStorage
 from acp_sdk.server.session import Session
 from acp_sdk.server.utils import stream_sse
 
@@ -56,6 +59,7 @@ def create_app(
     dependencies: list[Depends] | None = None,
 ) -> FastAPI:
     executor: ThreadPoolExecutor
+    storage: ResourceStorage = ResourceStorage()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
@@ -111,19 +115,26 @@ def create_app(
         return PingResponse()
 
     @app.post("/runs")
-    async def create_run(request: RunCreateRequest) -> RunCreateResponse:
+    async def create_run(request: RunCreateRequest, req: Request) -> RunCreateResponse:
         agent = find_agent(request.agent_name)
 
-        session = sessions.get(request.session_id, Session(id=request.session_id)) if request.session_id else Session()
+        session = (
+            sessions.get(request.session_id, Session(id=request.session_id, storage=storage))
+            if request.session_id
+            else Session(storage=storage)
+        )
         nonlocal executor
         bundle = RunBundle(
             agent=agent,
-            run=Run(agent_name=agent.name, session_id=session.id),
+            run=Run(
+                agent_name=agent.name,
+                session_url=AnyHttpUrl(url=str(req.url_for("get_session", session_id=session.id))),
+            ),
             input=request.input,
-            history=list(session.history()),
+            session=session,
+            storage=storage,
             executor=executor,
         )
-        session.append(bundle)
 
         runs[bundle.run.run_id] = bundle
         sessions[session.id] = session
@@ -203,5 +214,16 @@ def create_app(
             )
         await bundle.cancel()
         return JSONResponse(status_code=status.HTTP_202_ACCEPTED, content=jsonable_encoder(bundle.run))
+
+    @app.get("/sessions/{session_id}", name="get_session")
+    async def read_session(session_id: SessionId, req: Request) -> SessionReadResponse:
+        session = sessions.get(session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+        return SessionReadResponse(
+            id=session.id,
+            url=AnyHttpUrl(url=str(req.url_for("get_session", session_id=session.id))),
+            history=[resource.url for resource in session.history],
+        )
 
     return app
