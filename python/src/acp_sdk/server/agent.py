@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Callable
 
 import janus
+from obstore.store import ObjectStore
 
 from acp_sdk.models import (
     AgentName,
@@ -13,7 +14,6 @@ from acp_sdk.models import (
 )
 from acp_sdk.models.models import Metadata
 from acp_sdk.server.context import Context
-from acp_sdk.server.resource import ResourceStorage
 from acp_sdk.server.session import Session
 from acp_sdk.server.types import RunYield, RunYieldResume
 
@@ -40,7 +40,7 @@ class Agent(abc.ABC):
         pass
 
     async def execute(
-        self, input: list[Message], session: Session, storage: ResourceStorage, executor: ThreadPoolExecutor
+        self, input: list[Message], session: Session, storage: ObjectStore, executor: ThreadPoolExecutor
     ) -> AsyncGenerator[RunYield, RunYieldResume]:
         yield_queue: janus.Queue[RunYield] = janus.Queue()
         yield_resume_queue: janus.Queue[RunYieldResume] = janus.Queue()

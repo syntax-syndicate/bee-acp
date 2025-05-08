@@ -1,8 +1,8 @@
 from concurrent.futures import ThreadPoolExecutor
 
 import janus
+from obstore.store import ObjectStore
 
-from acp_sdk.server.resource import ResourceStorage
 from acp_sdk.server.session import Session
 from acp_sdk.server.types import RunYield, RunYieldResume
 
@@ -12,7 +12,7 @@ class Context:
         self,
         *,
         session: Session,
-        storage: ResourceStorage,
+        storage: ObjectStore,
         executor: ThreadPoolExecutor,
         yield_queue: janus.Queue[RunYield],
         yield_resume_queue: janus.Queue[RunYieldResume],

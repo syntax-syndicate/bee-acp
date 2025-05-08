@@ -150,7 +150,7 @@ AgentName = str
 SessionId = uuid.UUID
 RunId = uuid.UUID
 SessionUrl = AnyHttpUrl
-ResourceUrl = AnyHttpUrl
+ResourceUrl = AnyUrl
 
 
 class RunMode(str, Enum):
@@ -295,4 +295,4 @@ class Agent(BaseModel):
 class Session(BaseModel):
     id: SessionId
     url: AnyHttpUrl
-    history: list[AnyHttpUrl]
+    history: list[ResourceUrl]

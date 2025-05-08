@@ -2,14 +2,16 @@ import uuid
 from types import TracebackType
 from typing import Self
 
+from obstore.store import ObjectStore
+
 from acp_sdk.models import SessionId
-from acp_sdk.server.resource import Resource, ResourceStorage
+from acp_sdk.server.resource import Resource
 
 
 class Session:
     def __init__(
         self,
-        storage: ResourceStorage,
+        storage: ObjectStore,
         id: SessionId | None = None,
     ) -> None:
         self.id: SessionId = id or uuid.uuid4()
@@ -29,4 +31,9 @@ class Session:
         traceback: TracebackType | None = None,
     ) -> None:
         for resource in self.history:
-            await self.storage.store(resource)
+            print("STOING")
+            try:
+                await self.storage.put_async(str(resource.id), resource.content)
+                resource.url = f"file://{self.storage.prefix}/{resource.id}"
+            except Exception as e:
+                print(e)

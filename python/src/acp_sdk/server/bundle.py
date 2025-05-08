@@ -4,6 +4,7 @@ from collections.abc import AsyncGenerator
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
+from obstore.store import ObjectStore
 from pydantic import BaseModel, ValidationError
 
 from acp_sdk.instrumentation import get_tracer
@@ -32,7 +33,7 @@ from acp_sdk.models import (
 )
 from acp_sdk.server.agent import Agent
 from acp_sdk.server.logging import logger
-from acp_sdk.server.resource import Resource, ResourceStorage
+from acp_sdk.server.resource import Resource
 from acp_sdk.server.session import Session
 
 
@@ -44,7 +45,7 @@ class RunBundle:
         run: Run,
         input: list[Message],
         session: Session,
-        storage: ResourceStorage,
+        storage: ObjectStore,
         executor: ThreadPoolExecutor,
     ) -> None:
         self.agent = agent
@@ -191,5 +192,3 @@ class RunBundle:
                 finally:
                     self.await_or_terminate_event.set()
                     await self.stream_queue.put(None)
-                    if not self.task.done():
-                        self.task.cancel()

@@ -8,6 +8,7 @@ from cachetools import TTLCache
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse, StreamingResponse
+from obstore.store import LocalStore, ObjectStore
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from pydantic import AnyHttpUrl
 
@@ -43,7 +44,6 @@ from acp_sdk.server.errors import (
     http_exception_handler,
     validation_exception_handler,
 )
-from acp_sdk.server.resource import ResourceStorage
 from acp_sdk.server.session import Session
 from acp_sdk.server.utils import stream_sse
 
@@ -59,7 +59,7 @@ def create_app(
     dependencies: list[Depends] | None = None,
 ) -> FastAPI:
     executor: ThreadPoolExecutor
-    storage: ResourceStorage = ResourceStorage()
+    storage: ObjectStore = LocalStore(prefix="data", mkdir=True)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
@@ -223,7 +223,7 @@ def create_app(
         return SessionReadResponse(
             id=session.id,
             url=AnyHttpUrl(url=str(req.url_for("get_session", session_id=session.id))),
-            history=[resource.url for resource in session.history],
+            history=[resource.url for resource in session.history if resource.url],
         )
 
     return app
