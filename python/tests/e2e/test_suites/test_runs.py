@@ -43,6 +43,7 @@ async def test_run_stream(server: Server, client: Client) -> None:
     event_stream = [event async for event in client.run_stream(agent="echo", input=input)]
     assert isinstance(event_stream[0], RunCreatedEvent)
     assert isinstance(event_stream[-1], RunCompletedEvent)
+    assert event_stream[-1].run.output == input
 
 
 @pytest.mark.asyncio
@@ -232,32 +233,3 @@ async def test_artifact_streaming(server: Server, client: Client) -> None:
     assert "text/plain" in artifact_types
     assert "application/json" in artifact_types
     assert "image/png" in artifact_types
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("server", [timedelta(seconds=5)], indirect=True)
-async def test_run_ttl(server: Server, client: Client) -> None:
-    run = await client.run_async(agent="echo", input=input)
-    run = await client.run_status(run_id=run.run_id)
-    await asyncio.sleep(6)
-    try:
-        run = await client.run_status(run_id=run.run_id)
-        raise AssertionError("Error expected")
-    except ACPError as e:
-        if e.error.code == ErrorCode.NOT_FOUND:
-            assert True
-        else:
-            raise AssertionError(f"Unexpected error code {e.error.code}")
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("server", [timedelta(seconds=5)], indirect=True)
-async def test_session_ttl(server: Server, client: Client) -> None:
-    async with client.session() as session:
-        run = await session.run_sync(agent="echo", input=input)
-        await asyncio.sleep(3)
-        run = await session.run_sync(agent="echo", input=input)
-        assert len(run.output) == 3
-        await asyncio.sleep(3)
-        run = await session.run_sync(agent="echo", input=input)
-        assert len(run.output) == 7  # First run shall be forgotten

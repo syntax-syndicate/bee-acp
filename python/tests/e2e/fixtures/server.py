@@ -9,13 +9,32 @@ import pytest
 from acp_sdk.models import Artifact, AwaitResume, Error, ErrorCode, Message, MessageAwaitRequest, MessagePart
 from acp_sdk.models.errors import ACPError
 from acp_sdk.server import Context, Server
+from acp_sdk.server.store import MemoryStore, RedisStore, Store
+from pytest_redis import factories
+from pytest_redis.executor import RedisExecutor
+from redis.asyncio import Redis
 
 from e2e.config import Config
 
+redis_db_proc = factories.redis_proc(port=None)
 
-@pytest.fixture(scope="module", params=[timedelta(minutes=1)])
-def server(request: pytest.FixtureRequest) -> Generator[None]:
-    ttl = request.param
+
+@pytest.fixture(scope="module", params=["memory", "redis"])
+def store(request: pytest.FixtureRequest, redis_db_proc: RedisExecutor) -> Generator[Store]:
+    match request.param:
+        case "memory":
+            yield MemoryStore(limit=1000, ttl=timedelta(minutes=1))
+        case "redis":
+            redis = Redis(
+                unix_socket_path=redis_db_proc.unixsocket,
+            )
+            yield RedisStore(redis=redis)
+        case _:
+            raise AssertionError()
+
+
+@pytest.fixture(scope="module")
+def server(request: pytest.FixtureRequest, store: Store) -> Generator[None]:
     server = Server()
 
     @server.agent()
@@ -89,7 +108,7 @@ def server(request: pytest.FixtureRequest) -> Generator[None]:
             content_encoding="base64",
         )
 
-    thread = Thread(target=server.run, kwargs={"run_ttl": ttl, "port": Config.PORT}, daemon=True)
+    thread = Thread(target=server.run, kwargs={"store": store, "port": Config.PORT}, daemon=True)
     thread.start()
 
     time.sleep(1)
