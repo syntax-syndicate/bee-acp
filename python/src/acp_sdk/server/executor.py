@@ -83,11 +83,14 @@ class Executor:
             if resume is not None:
                 data.await_resume = None
                 return resume
+        # Run has been terminated, give cancellation chance to kick in
+        await self.watcher
 
     async def _watch_for_cancellation(self) -> None:
         async for data in self.run_data.watch(self.store):
             if data.run.status == RunStatus.CANCELLING:
                 self.task.cancel()
+                return
 
     async def _execute(self, input: list[Message], *, executor: ThreadPoolExecutor) -> None:
         with get_tracer().start_as_current_span("run"):
