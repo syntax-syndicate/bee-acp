@@ -83,5 +83,5 @@ jobs:
       - name: Run E2E Tests
         run: uv run pytest tests/e2e
         env:
-          REDIS_HOST: redis
+          REDIS_HOST: localhost
           REDIS_PORT: 6379
