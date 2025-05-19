@@ -1,11 +1,9 @@
 import asyncio
 import base64
-from datetime import timedelta
 
 import pytest
 from acp_sdk.client import Client
 from acp_sdk.models import (
-    ACPError,
     AgentName,
     ArtifactEvent,
     ErrorCode,
