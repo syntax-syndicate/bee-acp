@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import os
 import time
 from collections.abc import AsyncGenerator, AsyncIterator, Generator
 from datetime import timedelta
@@ -11,16 +12,23 @@ from acp_sdk.models.errors import ACPError
 from acp_sdk.server import Context, Server
 from acp_sdk.server.store import MemoryStore, RedisStore, Store
 from pytest_redis import factories
-from pytest_redis.executor import RedisExecutor
+from pytest_redis.executor import NoopRedis, RedisExecutor
 from redis.asyncio import Redis
 
 from e2e.config import Config
 
-redis_db_proc = factories.redis_proc(port=None)
+REDIS_HOST = os.getenv("REDIS_HOST", None)
+REDIS_PORT = os.getenv("REDIS_PORT", None)
+
+redis_db_proc = (
+    factories.redis_noproc(host=REDIS_HOST, port=int(REDIS_PORT))
+    if REDIS_HOST and REDIS_PORT
+    else factories.redis_proc()
+)
 
 
 @pytest.fixture(scope="module", params=["memory", "redis"])
-def store(request: pytest.FixtureRequest, redis_db_proc: RedisExecutor) -> Generator[Store]:
+def store(request: pytest.FixtureRequest, redis_db_proc: RedisExecutor | NoopRedis) -> Generator[Store]:
     match request.param:
         case "memory":
             yield MemoryStore(limit=1000, ttl=timedelta(minutes=1))
